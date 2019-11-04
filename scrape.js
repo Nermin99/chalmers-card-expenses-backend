@@ -2,81 +2,48 @@ const request = require('request')
 const cheerio = require('cheerio')
 
 const siteURL = 'https://kortladdning3.chalmerskonferens.se'
-const CARDNUMBER = 3819297030875221
+
+// find and paste in userInfo cookie here. Repeat once a year
+const userInfo = 'userInfo=1B21544D042A18117342D60657B21C69F73BA30F74A6D87EDEFEF4F63F768022D4224648313082E019A766C11B995A73D5C02F32E8127ECC7B5BF1E7F5871092A9EA677E35BE4E6C0C85CA8CB776D9CEF172701CEE0456E031ED2E141F174D3A3CF6CA020323EC7C88016E58FD69711FC8F965E45A46D966EC1DE1F81D00411A5B8572EEFA57467F8F540F92CF71CE0F764D2649A7A6FAA17241E5195BB9B10DB75AD512B94AB983E88B26DD5EF1FC65E3DA2A742800BBAA565466EAEFE25B86FD72C88BD8EA40C0844C63CB577A534ED3592E9EC04F414238A69F61B4AE4D9BF7BD83A9A26D4A5D1DEB09FE72331C3A'
 
 let cookieJar = request.jar();
-let cookieString;
 
 let options = {
   url: siteURL,
   jar: cookieJar,
   headers: {
-    'Cookie': 'AspxAutoDetectCookieSupport=1; ASP.NET_SessionId=zdzcs15tf2yvvbysjdwjix15; cookieconsent_dismissed=yes; userInfo=A867718FF0054D7E15A4ACF5F1BC8709F3018376A78F1DF977007524C2AA6A3C0225B79F1C0A4688816BB4BA9D922349B87B099E20DF776A609E09A1353124D9347679804859A8EAD9AFF6D4345897E766DEF9AC3E4003395CA0DF035DEA210D94831FD39E19F552CE090F3EA0BC670A1D53A8E0709406C0DA2D4613868876CDD34CBBB6237B23FC223BD8B44EE96989AD04C2B9CAF3CEC497C7E7531214EEBBFDF18DA18E061C0F093A438DB0C500BB9E83C10C84BC19BD02A4FA64977F5D1B9DC0BF8359AB44C0D9B3D2F67FFD165240AAA60210414DBADEAC5CF5CA3EB601B5ABBAC899F12BA7C4528E287F18F259; ASP.NET_SessionId=edltaeeo3jvuo4zv4dtvaej0',
-    'User-Agent': '', // Any User-Agent header must be sent,
-    'Referer': 'https://kortladdning3.chalmerskonferens.se/',
-    'Connection': 'keep-alive',
+    'Accept': '*/*',
     'Accept-Encoding': 'br', // mby not necessary
     'Cache-Control': 'no-cache',
-    'Accept': '*/*'
+    'Connection': 'keep-alive',
+    'Cookie': userInfo,
+    'Referer': siteURL,
+    'User-Agent': '' // Any User-Agent header must be sent
   }
 }
 
-let test = {
-  url: 'https://kortladdning3.chalmerskonferens.se',
-  // method: 'get',
-  jar: cookieJar,
-}
-
-// supposed to be self-invoking function to do everything
-function main() {
-
-}
-
 request.get({ url: siteURL, jar: cookieJar }, (err, res, body) => {
-  getSessionCookie(err, res, body)
-  request.post(options, (err, res, body) => {
-    // printResult(err, res, body)
-  })
+  options.headers.Cookie += getSessionCookie(err, res, body)
+
+  request(options, printResult)
 })
 
 function getSessionCookie(err, res, body) {
-  // if (err || res.statusCode !== 200) { console.log(err, res.statusCode); return }
-  cookieString = cookieJar.getCookieString(siteURL)
-  options.headers.Cookie = cookieString
-  console.log(options.headers.Cookie);
+  if (err || res.statusCode !== 200) { console.log({ err: err }, res.statusCode); return }
+  const cookieString = cookieJar.getCookieString(siteURL)
+
+  // console.log(cookieString)
+  return ';' + cookieString
 }
 
 function printResult(err, res, body) {
-  // if (err || res.statusCode !== 200) { console.log(err, res.statusCode); return }
+  if (err || res.statusCode !== 200) { console.log({ err: err }, res.statusCode); return }
   const $ = cheerio.load(body)
-  console.log(res.headers)
+  // console.log(res.headers)
 
   const html = $.html()
   // console.log(html)
   // console.log($('document'))
-
-
-  const cookies = cookieJar.getCookies(options.url)
-  console.log(cookies)
 
   console.log($('#txtPTMCardValue').html())
 }
-
-return
-request(options, (err, res, body) => {
-  if (err || res.statusCode !== 200) return
-  const $ = cheerio.load(body)
-  console.log(res.headers)
-
-  const html = $.html()
-  // console.log(html)
-  // console.log($('document'))
-
-
-  const cookie_string = cookieJar.getCookies(options.url)
-  const cookies = cookieJar.getCookies(options.url)
-  console.log(cookie_string, cookies)
-  console.log(cookieJar)
-
-  console.log($('#txtPTMCardValue').html())
-})
