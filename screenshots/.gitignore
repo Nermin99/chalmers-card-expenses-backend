@@ -1,0 +1,5 @@
+# Don't commit the screenshots
+*
+
+# But keep the folder :)
+!.gitignore
