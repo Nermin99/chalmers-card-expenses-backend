@@ -2,6 +2,7 @@ const request = require('request');
 const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
+const bcrypt = require('bcrypt');
 
 // find and paste in userInfo cookie here. Repeat once a year
 const userInfo = {
@@ -13,6 +14,7 @@ const userInfo = {
 const startDate = "2012-12-12" // scrape from this date to present
 
 const siteURL = 'https://kortladdning3.chalmerskonferens.se';
+let cookies = [];
 let cookieJar = request.jar();
 
 let requestOptions = {
@@ -39,29 +41,108 @@ function getSessionCookie() {
   })
 }
 
-async function navigateToStatements(page, cookies) {
+function getUserInfo(page) {
+  let contents;
+  try {
+    contents = fs.readFileSync('.env', 'utf8')
+  } catch (err) {
+    console.error(err)
+    process.exit();
+  }
+
+  const cardNumber = contents.match(/(?<=CARDNUMBER=).+/)
+  const userInfoValue = contents.match(/(?<=userInfo=).+/)
+  // console.log(cardNumber)
+  // console.log(userInfoValue)
+
+  if (userInfoValue) {
+    return { name: 'userInfo', value: userInfoValue[0] }
+  } else {
+    return userLogIn(page, cardNumber).then(obj => obj)
+  }
+}
+
+async function userLogIn(page2, cardNumber) {
+  const browser = await puppeteer.launch({
+    headless: false,
+    ignoreHTTPSErrors: true,
+    args: [`--window-size=${770},${850}`]
+    // slowMo: 250 // slow down by 250ms
+  })
+  const page = await browser.newPage()
+  page.on('console', msg => console.log('PAGE LOG:', msg.text())) // log 'console logs' on client
   await page.setViewport({
     width: 770,
-    height: 700
+    height: 850
   })
-  page.on('console', msg => console.log('PAGE LOG:', msg.text())) // log 'console logs' on client
 
-  await page.goto(siteURL, { waitUntil: 'domcontentloaded' }) // visit site first time to get sessionID
-  await page.setCookie(...cookies);
+  cookies.push({
+    'name': 'cookieconsent_dismissed',
+    'value': 'yes',
+    'url': siteURL
+  });
+  await page.setCookie(...cookies)
+
+  // console.log(cookies);
+
+  await page.goto(siteURL)
+  // if (cardNumber) {
+  //   await page.evaluate(card => {
+  //     console.log(card)
+  //   }, cardNumber)
+  // }
+
+  // if (cardNumber) {
+  //   await page.setRequestInterception(true);
+  //   page.on('request', request => {
+  //     const data = {
+  //       'method': 'POST',
+  //       'postData': `txtCardNumber=3819297030875221`
+  //     }
+  //     request.continue(data)
+  //   });
+  // }
+
+  await page.waitForSelector('#txtPTMCardValue', {
+    visible: true,
+    timeout: 0
+  })
+  await page.screenshot({ path: 'screenshots/1.png' })
+
+  const userInfoCookie = (await page.cookies(siteURL)).find(obj => obj.name === 'userInfo')
+
+  if (!userInfoCookie) console.error("Cookie was not set after login!")
+
+  const usInfo = {
+    name: 'userInfo',
+    value: userInfoCookie.value
+  };
+
+  await browser.close() // no need to wait
+  console.log(usInfo)
+  return usInfo
+}
+
+async function navigateToStatements(page, uInfo) {
+  cookies.push({
+    'name': uInfo.name,
+    'value': uInfo.value,
+    'url': siteURL
+  });
+  await page.setCookie(...cookies)
 
   await page.goto(siteURL, { waitUntil: 'domcontentloaded' }) // go to logged in site
-  // await page.screenshot({ path: 'screenshots/1-logged_in.png' })
 
   await page.click('#btnAccountStatements') // go to account statements - page
-  // await page.screenshot({ path: 'screenshots/2-statements_page.png' })
+  // await page.screenshot({ path: 'screenshots/2-statements_page.png', fullPage: true })
 
   await page.evaluate(date => {
     const fromDate = document.querySelector('#txtStatementStartDate')
-    fromDate.value = date
+    fromDate.value = date // set starting date
   }, startDate)
 
   await page.click('#btnCheckAccountStatement') // show account statements
-  // await page.screenshot({ path: 'screenshots/3-statements.png' })
+  // await page.screenshot({ path: 'screenshots/3-statements.png', fullPage: true })
 }
 
 function getJsonData(serializedHTML) {
@@ -93,12 +174,14 @@ function getJsonData(serializedHTML) {
 }
 
 function saveToCSV(jsonData) {
-  const writeStream = fs.createWriteStream('RESULTS/statements.csv', { encoding: 'utf8' })
+  const writeStream = fs.createWriteStream('RESULTS/statements.csv')
   writeStream.write(`Datum, Namn, Pris \n`)
 
   jsonData.map(row => {
     writeStream.write(`${row.date}, \"${row.name}\", \"${row.price}\" \n`)
   })
+
+  writeStream.end();
 }
 
 function saveToJSON(jsonData) {
@@ -112,26 +195,21 @@ async function main() {
   // const sessionCookie = (await getSessionCookie()).split('=')
   // console.log(sessionCookie)
 
-  const cookies = [{
-    'name': userInfo.name,
-    'value': userInfo.value,
-    'url': siteURL
-  }
-    //   , {
-    //   'name': sessionCookie[0],
-    //   'value': sessionCookie[1],
-    //   'url': siteURL
-    // }
-  ];
-
   const browser = await puppeteer.launch({
     // headless: false,
     // slowMo: 250 // slow down by 250ms
   })
-
   const page = await browser.newPage()
+  page.on('console', msg => console.log('PAGE LOG:', msg.text())) // log 'console logs' on client
+  await page.goto(siteURL, { waitUntil: 'domcontentloaded' }) // get session cookies
 
-  await navigateToStatements(page, cookies);
+  cookies = await page.cookies(siteURL)
+  await page.setCookie(...cookies)
+
+  const usInfo = await getUserInfo(page)
+  // return await browser.close()
+
+  await navigateToStatements(page, usInfo);
 
   const html = await page.content() // serialized HTML
   const jsonData = getJsonData(html)
@@ -139,10 +217,8 @@ async function main() {
   saveToCSV(jsonData)
   saveToJSON(jsonData)
 
-  await browser.close();
-
   console.log("Done.")
-  return jsonData
+  return await browser.close();
 }
 
 main();
