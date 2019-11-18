@@ -41,25 +41,10 @@ function getSessionCookie() {
   })
 }
 
-function getUserInfo(page) {
-  let contents;
-  try {
-    contents = fs.readFileSync('.env', 'utf8')
-  } catch (err) {
-    console.error(err)
-    process.exit();
-  }
-
-  const cardNumber = contents.match(/(?<=CARDNUMBER=).+/)
-  const userInfoValue = contents.match(/(?<=userInfo=).+/)
-  // console.log(cardNumber)
-  // console.log(userInfoValue)
-
-  if (userInfoValue) {
-    return { name: 'userInfo', value: userInfoValue[0] }
-  } else {
-    return userLogIn(page, cardNumber).then(obj => obj)
-  }
+async function saveUserInfo(userInfo) {
+  const contents = readFile('.env', 'utf8')
+  const newContent = contents.replace(/userInfo=/, userInfo.string)
+  writeFile(newContent, '.env')
 }
 
 async function userLogIn(page2, cardNumber) {
@@ -115,12 +100,33 @@ async function userLogIn(page2, cardNumber) {
 
   const usInfo = {
     name: 'userInfo',
-    value: userInfoCookie.value
+    value: userInfoCookie.value,
+    string: 'userInfo=' + userInfo.value.toString()
   };
 
-  await browser.close() // no need to wait
-  console.log(usInfo)
+  browser.close() // no need to wait
   return usInfo
+}
+
+async function getUserInfo(page) {
+  let contents;
+  try {
+    contents = fs.readFileSync('.env', 'utf8')
+  } catch (err) {
+    console.error(err)
+    process.exit();
+  }
+
+  const cardNumber = contents.match(/(?<=CARDNUMBER=).+/)
+  const userInfoValue = contents.match(/(?<=userInfo=).+/)
+
+  if (userInfoValue) {
+    return { name: 'userInfo', value: userInfoValue[0] }
+  } else {
+    const userInfo = await userLogIn(page, cardNumber)
+    saveUserInfo(userInfo)
+    return userInfo
+  }
 }
 
 async function navigateToStatements(page, uInfo) {
@@ -207,6 +213,7 @@ async function main() {
   await page.setCookie(...cookies)
 
   const usInfo = await getUserInfo(page)
+
   // return await browser.close()
 
   await navigateToStatements(page, usInfo);
@@ -222,3 +229,17 @@ async function main() {
 }
 
 main();
+
+function readFile(filePath = '.env', encoding = 'utf8') {
+  try {
+    return fs.readFileSync(filePath, encoding).toString()
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+function writeFile(dataString, filePath = '.env') {
+  fs.writeFile(filePath, dataString, err => {
+    if (err) console.log(err)
+  })
+}
