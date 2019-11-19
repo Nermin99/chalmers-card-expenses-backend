@@ -1,0 +1,4 @@
+# This directory needs to exist beforehand on Windows
+
+*
+!.gitignore
