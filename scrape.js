@@ -6,6 +6,7 @@ const fs = require('fs');
 const startDate = "2012-12-12" // scrape from this date to present
 
 const siteURL = 'https://kortladdning3.chalmerskonferens.se';
+
 let cookies = [];
 let cookieJar = request.jar();
 
@@ -35,7 +36,7 @@ function getSessionCookie() {
 
 async function saveUserInfo(userInfo) {
   const contents = readFile('.env', 'utf8')
-  const newContent = contents.replace(/userInfo=/, userInfo.string)
+  const newContent = contents.replace(/userInfo=.*/, userInfo.string)
   writeFile(newContent, '.env')
 }
 
@@ -62,6 +63,8 @@ async function userLogIn(page2, cardNumber) {
 
   // console.log(cookies);
 
+  await page.screenshot({ path: 'screenshots/1.png' })
+
   await page.goto(siteURL)
   // if (cardNumber) {
   //   await page.evaluate(card => {
@@ -80,15 +83,27 @@ async function userLogIn(page2, cardNumber) {
   //   });
   // }
 
+  // Guarantees "remember me" - button always clicked
+  await page.waitForSelector('#chkRememberMe', {
+    timeout: 0
+  }).then(() => {
+    page.screenshot({ path: 'screenshots/2.png' })
+    page.evaluate(() => {
+      document.querySelector('#btnLogin').addEventListener('click', () => {
+        document.querySelector('#chkRememberMe').checked = true;
+      })
+    })
+  })
+
   await page.waitForSelector('#txtPTMCardValue', {
     visible: true,
     timeout: 0
   })
-  await page.screenshot({ path: 'screenshots/1.png' })
+  await page.screenshot({ path: 'screenshots/3.png' })
 
   const userInfoCookie = (await page.cookies(siteURL)).find(obj => obj.name === 'userInfo')
 
-  if (!userInfoCookie) console.error("Cookie was not set after login!")
+  if (!userInfoCookie) throw Error("Cookie was not set after login!")
 
   const usInfo = {
     name: 'userInfo',
@@ -121,10 +136,10 @@ async function getUserInfo(page) {
   }
 }
 
-async function navigateToStatements(page, uInfo) {
+async function navigateToStatements(page, userInfo) {
   cookies.push({
-    'name': uInfo.name,
-    'value': uInfo.value,
+    'name': userInfo.name,
+    'value': userInfo.value,
     'url': siteURL
   });
   await page.setCookie(...cookies)
@@ -134,13 +149,18 @@ async function navigateToStatements(page, uInfo) {
   await page.click('#btnAccountStatements') // go to account statements - page
   // await page.screenshot({ path: 'screenshots/2-statements_page.png', fullPage: true })
 
-  await page.evaluate(date => {
+  const balance = await page.evaluate(date => {
     const fromDate = document.querySelector('#txtStatementStartDate')
     fromDate.value = date // set starting date
+
+    // Just for getting the account balance
+    return document.querySelector('#txtPTMCardValue').innerText;
   }, startDate)
 
   await page.click('#btnCheckAccountStatement') // show account statements
   // await page.screenshot({ path: 'screenshots/3-statements.png', fullPage: true })
+
+  return balance
 }
 
 function getJsonData(serializedHTML) {
@@ -204,11 +224,11 @@ async function main() {
   cookies = await page.cookies(siteURL)
   await page.setCookie(...cookies)
 
-  const usInfo = await getUserInfo(page)
+  const userInfo = await getUserInfo(page)
 
   // return await browser.close()
 
-  await navigateToStatements(page, usInfo);
+  const balance = await navigateToStatements(page, userInfo);
 
   const html = await page.content() // serialized HTML
   const jsonData = getJsonData(html)
@@ -216,8 +236,8 @@ async function main() {
   saveToCSV(jsonData)
   saveToJSON(jsonData)
 
-  console.log("Done.")
-  return await browser.close();
+  browser.close();
+  return console.log(`Balance: ${balance}kr`)
 }
 
 main();
