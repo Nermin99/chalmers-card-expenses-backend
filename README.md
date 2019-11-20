@@ -16,9 +16,9 @@ npm install
 ## Starting
 The first time you will be prompted for a manual login, in order to save your cookie, thereafter it's handled automatically (for another year).
 
-To run the scraper:
+To run the app:
 ```
-node scrape.js
+npm start
 ```
 
 ## Handling the Data

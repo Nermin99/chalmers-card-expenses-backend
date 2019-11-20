@@ -63,7 +63,7 @@ async function userLogIn(page2, cardNumber) {
 
   // console.log(cookies);
 
-  await page.screenshot({ path: 'screenshots/1.png' })
+  // await page.screenshot({ path: 'screenshots/1.png' })
 
   await page.goto(siteURL)
   // if (cardNumber) {
@@ -87,7 +87,7 @@ async function userLogIn(page2, cardNumber) {
   await page.waitForSelector('#chkRememberMe', {
     timeout: 0
   }).then(() => {
-    page.screenshot({ path: 'screenshots/2.png' })
+    // page.screenshot({ path: 'screenshots/2.png' })
     page.evaluate(() => {
       document.querySelector('#btnLogin').addEventListener('click', () => {
         document.querySelector('#chkRememberMe').checked = true;
@@ -99,7 +99,7 @@ async function userLogIn(page2, cardNumber) {
     visible: true,
     timeout: 0
   })
-  await page.screenshot({ path: 'screenshots/3.png' })
+  // await page.screenshot({ path: 'screenshots/3.png' })
 
   const userInfoCookie = (await page.cookies(siteURL)).find(obj => obj.name === 'userInfo')
 
