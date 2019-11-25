@@ -1,4 +1,3 @@
-const request = require('request');
 const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
@@ -9,7 +8,7 @@ const siteURL = 'https://kortladdning3.chalmerskonferens.se';
 
 let cookies = [];
 
-(async function main() {
+(async () => {
   const browser = await puppeteer.launch()
   const page = await browser.newPage()
   await page.goto(siteURL, { waitUntil: 'domcontentloaded' })
@@ -28,7 +27,9 @@ let cookies = [];
 
   browser.close();
   return console.log(`Balance: ${balance}kr`)
-}());
+})().catch(err => {
+  console.error(err)
+})
 
 // returns the userInfo-cookie
 async function getUserInfo() {
