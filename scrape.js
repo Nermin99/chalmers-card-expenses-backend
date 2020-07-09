@@ -181,7 +181,7 @@ function saveToCSV(jsonData) {
 }
 
 function saveToJSON(jsonData) {
-  jsonString = JSON.stringify(jsonData)
+  jsonString = JSON.stringify(jsonData, null, 2)
   fs.writeFile('RESULTS/statements.json', jsonString, err => {
     if (err) console.log(err)
   })
