@@ -1,3 +1,5 @@
+# NOTE: The chalmers statements website has been replaced with a new and improved one, thus rendering this project obsolete!
+
 # chalmers-statemets-scraper
 Temporary Node.js scraper for your chalmers-card account statements, until Chalmers decides to build an API.
 
